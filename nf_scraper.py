@@ -59,24 +59,26 @@ def scrape():
                  'fp.3': 'fp_yh', 'cost.2': 'cst_yh',
                  'value.2': 'val_yh'}
 
-    # columns to keep from scraped data
-    ctok = ['name', 'team', 'pos', 'opponent', 'fp_fd', 'cst_fd', 'val_fd', 'fp_dk' ,'cst_dk',
-            'val_dk', 'fp_yh', 'cst_yh', 'val_yh']
 
+    
     # import projection data
     data_frames = [pd.read_csv(f) for f in data_files]
 
-    df = pd.concat(data_frames)
+    df = pd.concat(data_frames, sort=False)
     df['pos'] = df['pos'].str.upper()
     df['pos'] = df['pos'].replace({'D': 'DST'})
     df = df.rename(columns=ctor_dict)
+    
 
+    keep_cols = ['name', 'pos', 'team', 'fp_fd', 'fp_dk', 'cst_fd', 'cst_dk',
+                 'val_dk', 'val_fd']
+    df = df.loc[:, keep_cols]
+    
     # format cost column data
     cst_cols = [c for c in df.columns if 'cst_' in c]
-
     for c in cst_cols:
-        df[c] = df[c].str.replace('$', '').astype(float)
-
+        df[c] = df[c].str.replace('$', '').astype(float)    
+    
     # drop 'd/st' from defense names
     def fix_name(row):
         if row['pos'] != 'DST':
@@ -86,10 +88,9 @@ def scrape():
             return name
 
     df['name'] = df.apply(fix_name, axis=1)
-
-    df = df.loc[:, ['name', 'pos', 'team', 'fp_fd']]
-
+    
+    
     f = 'data/nf_projections.csv'
     print 'writing ' + f
-    df.to_csv(f, index=False, header=False)
+    df.to_csv(f, index=False)
     [os.remove(f) for f in data_files]
