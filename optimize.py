@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 import cvxpy
 import random
+import operator
 
-from constants import ROSTER, BUDGET
+from constants import ROSTER, BUDGET, CONTEST_ID, N_LINEUPS, MAX_OVERLAP
 
 def get_constraints(n_todraft, roster_todraft, player_pool, budget, selection,
                     costs):
@@ -85,7 +86,7 @@ def get_lineup_ids(index_list):
         ids.append(id)
     return ids
 
-def lineup_from_ids(index_list):
+def lineup_from_ids(lineup_ids):
     pos_max = {'RB': 2, 'WR': 3, 'TE': 1}
     players = player_pool[player_pool['pool_id'].isin(lineup_ids)]
     lineup = {'QB': [], 'RB': [], 'WR': [], 'TE': [], 'FLEX': [], 'DST': []}
@@ -108,10 +109,6 @@ def get_name(id_number, player_dict):
     name = player_dict[id_number]['name']
     return name
 
-#def names_from_ids():
-    
-
-
 # import cheat sheet file with player data 
 data_in = "data/"
 df = pd.read_csv(data_in + 'pool.csv')
@@ -119,11 +116,19 @@ df = pd.read_csv(data_in + 'pool.csv')
 # remove missing salary rows
 df = df[df['cst_fd'].notnull()]
 
+# remove bottom half defenses
+dst = df[df['pos'] == 'DST']
+dst_cut = dst.shape[0] / 2
+dst_cut_id = dst.iloc[dst_cut:, ]['pool_id'].values
+
+df = df[~df['pool_id'].isin(dst_cut_id)]
+
+
 # set budget
 budget = BUDGET
 roster_todraft = ROSTER
 n_start = sum(ROSTER.values())
-lineups_toget = 3
+lineups_toget = N_LINEUPS
 lineups_got = 0
 
 # name column to sum for the maximization function 
@@ -138,10 +143,25 @@ while lineups_got < lineups_toget:
 
     # copy of cheatsheet data to update during nomination
     player_pool = df.copy()
-    costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
-    selection = cvxpy.Bool(len(costs))    
 
+    # set exposure limits
+    id_count = {}
+    id_prop = {}
+    used = set(x for l in lineups_unique for x in l)
+    for id in used:
+        n = sum(list(l).count(id) for l in lineups_unique)
+        id_count[id] = n
+        id_prop[id] = float(n) / float(len(lineups_unique))
+    
+    for k in id_prop.keys():
+        if id_prop[k] > 0.20:
+            player_pool = player_pool.loc[player_pool['pool_id'] != k]
+    
+    costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
+    selection = cvxpy.Bool(len(costs))
+    
     new_lineup = False
+    
     while new_lineup == False:
 
         # get indices of players to select
@@ -150,29 +170,38 @@ while lineups_got < lineups_toget:
                                       costs)
         sel_index = get_selection_indices(player_pool, selection,
                                           constraints, n_start)
-        if set(sel_index) not in lineups_unique:
-            new_lineup = True
-        else:
-            p_remove = random.choice(sel_index)
-            player_pool = player_pool.drop(p_remove)
-            costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
-            selection = cvxpy.Bool(len(costs))
+        lineup = player_pool.iloc[sel_index, :].sort_values('pos')
+        lineup_ids = lineup['pool_id'].values
+        
+        overlaps = []
+        for lu in lineups_unique:
+            nov = len(set(lineup_ids) & set(lu))
+            overlaps.append(nov)
 
-    lineup = player_pool.iloc[sel_index, :].sort_values('pos')
+        if any(x > MAX_OVERLAP for x in overlaps):
+            id_remove = random.choice(lineup_ids)
+            player_pool = player_pool.loc[player_pool['pool_id'] != id_remove]
+            costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
+            selection = cvxpy.Bool(len(costs))    
+        else:
+            new_lineup = True
+    
     print "Lineup %s" % (lineups_got + 1)
     print lineup
-    lineups_unique.append(set(sel_index))
+    lineups_unique.append(lineup_ids)
     lineups_got += 1
-    lineup_ids = get_lineup_ids(sel_index)
-    print player_pool[player_pool['pool_id'].isin(lineup_ids)]
-    lineups.append(lineup_from_ids(lineup_ids))
+    #lineup_ids = get_lineup_ids(sel_index)
+    lineups.append(list_from_lineup(lineup_from_ids(lineup_ids)))
 
-lineup_list = [list_from_lineup(x) for x in lineups]
+cols_tmp = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DEF']
+df_tmp = pd.DataFrame(lineups, columns = cols_tmp)
+f_tmp = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup-upload-template.csv'])
+df_tmp.to_csv(f_tmp, index=False)
 
+sorted_used = sorted(id_prop.items(), key=operator.itemgetter(1), reverse=True)
 
-player_dict = df[['name', 'pool_id']].set_index('pool_id').to_dict('index')
+id_name = df[['pool_id', 'name']].set_index('pool_id').to_dict('index')
 
-
-one_lineup = lineup_list[0]
-names = [get_name(x, player_dict) for x in one_lineup]
-print names
+for id_prop in sorted_used:
+    id = id_prop[0]
+    print id_name[id]['name'], round(id_prop[1], 2)
