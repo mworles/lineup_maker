@@ -4,7 +4,8 @@ import cvxpy
 import random
 import operator
 
-from constants import ROSTER, BUDGET, CONTEST_ID, N_LINEUPS, MAX_OVERLAP
+from constants import ROSTER, BUDGET, CONTEST_ID
+from constants import N_LINEUPS, MAX_OVERLAP, MAX_EXPOSURE
 
 def get_constraints(n_todraft, roster_todraft, player_pool, budget, selection,
                     costs):
@@ -153,8 +154,11 @@ while lineups_got < lineups_toget:
         id_count[id] = n
         id_prop[id] = float(n) / float(len(lineups_unique))
     
+    print 'setting exposure limits'
+    
     for k in id_prop.keys():
-        if id_prop[k] > 0.20:
+        if id_prop[k] > MAX_EXPOSURE:
+            
             player_pool = player_pool.loc[player_pool['pool_id'] != k]
     
     costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
@@ -174,11 +178,13 @@ while lineups_got < lineups_toget:
         lineup_ids = lineup['pool_id'].values
         
         overlaps = []
+
         for lu in lineups_unique:
             nov = len(set(lineup_ids) & set(lu))
             overlaps.append(nov)
 
         if any(x > MAX_OVERLAP for x in overlaps):
+            print 'failed minimum unique criterion, removing random player'
             id_remove = random.choice(lineup_ids)
             player_pool = player_pool.loc[player_pool['pool_id'] != id_remove]
             costs = np.array(player_pool.loc[:, 'cst_fd']).astype(int)
@@ -187,6 +193,7 @@ while lineups_got < lineups_toget:
             new_lineup = True
     
     print "Lineup %s" % (lineups_got + 1)
+    print ''
     print lineup
     lineups_unique.append(lineup_ids)
     lineups_got += 1
@@ -200,8 +207,14 @@ df_tmp.to_csv(f_tmp, index=False)
 
 sorted_used = sorted(id_prop.items(), key=operator.itemgetter(1), reverse=True)
 
-id_name = df[['pool_id', 'name']].set_index('pool_id').to_dict('index')
+name_dict = df[['pool_id', 'name']].set_index('pool_id').to_dict('index')
 
 for id_prop in sorted_used:
     id = id_prop[0]
-    print id_name[id]['name'], round(id_prop[1], 2)
+    print name_dict[id]['name'], round(id_prop[1], 2)
+
+lineup_names = [[get_name(p, name_dict) for p in l] for l in lineups]
+
+df_names = pd.DataFrame(lineup_names, columns=cols_tmp)
+f_names = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup_names.csv'])
+df_names.to_csv(f_names, index=False)

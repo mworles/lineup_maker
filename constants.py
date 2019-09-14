@@ -1,4 +1,4 @@
-N_LINEUPS = 20
+N_LINEUPS = 150
 
 ROSTER = {'qb': 1,
           'rb': 2,
@@ -17,6 +17,8 @@ TEAMS_NF_FD = {'WSH': 'WAS',
                'LA': 'LAR'
                }
 
-MIN_UNIQUE = 3
+MIN_UNIQUE = 4
 
 MAX_OVERLAP = sum(ROSTER.values()) - MIN_UNIQUE
+
+MAX_EXPOSURE = 0.40
