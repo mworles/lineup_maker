@@ -4,17 +4,20 @@ from urllib import urlopen
 from bs4 import BeautifulSoup
 import time
 import os
+from constants import YEAR
 
-url = 'https://www.numberfire.com/nfl/fantasy/fantasy-football-projections'
-urls = [url, url + '/d']
-
-data_files = []
-
-def scrape():
+def scrape(urls):
+    
+    data_files = []
+    
     for u in urls:
         html = urlopen(u)
         print 'scraping ' + u
         soup = BeautifulSoup(html.read(), "lxml")
+        
+        hed = soup.find('div', {'class': 'projection-rankings__hed'})
+        week = hed.find('h2').get_text().strip().split(' ')[1]
+        
         tables = soup.find_all('table')
         tab0 = tables[0]
         header = tab0.find('th', {'title': 'Player'}).get_text().strip()
@@ -93,4 +96,10 @@ def scrape():
     f = 'data/nf_projections.csv'
     print 'writing ' + f
     df.to_csv(f, index=False)
+    
+    f_arch = "".join(['nf_projections_', str(YEAR), '_', week, '.csv'])
+    f_arch = "".join(['data/projections_archive/', f_arch])
+    print 'writing ' + f_arch
+    df.to_csv(f_arch, index=False)
+
     [os.remove(f) for f in data_files]
