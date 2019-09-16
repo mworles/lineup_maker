@@ -1,4 +1,6 @@
-N_LINEUPS = 150
+N_LINEUPS = 10
+
+YEAR = 2019
 
 ROSTER = {'qb': 1,
           'rb': 2,
@@ -11,14 +13,14 @@ ROSTER = {'qb': 1,
 BUDGET = 60000
 
 # contest identifier
-CONTEST_ID = '2019-09-15-38352'
+CONTEST_ID = '2019-09-15-38382'
 
 TEAMS_NF_FD = {'WSH': 'WAS',
                'LA': 'LAR'
                }
 
-MIN_UNIQUE = 4
+MIN_UNIQUE = 3
 
 MAX_OVERLAP = sum(ROSTER.values()) - MIN_UNIQUE
 
-MAX_EXPOSURE = 0.40
+MAX_EXPOSURE = 0.50
