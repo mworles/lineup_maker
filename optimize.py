@@ -8,7 +8,7 @@ from constants import ROSTER, BUDGET, CONTEST_ID
 from constants import N_LINEUPS, MAX_OVERLAP, MAX_EXPOSURE
 
 def get_constraints(n_todraft, roster_todraft, player_pool, budget, selection,
-                    costs):
+                    costs, team_limit = False):
             
     constraints = []
     # constraint 1
@@ -48,7 +48,7 @@ def get_constraints(n_todraft, roster_todraft, player_pool, budget, selection,
     # dst selected must equal number of dst slots
     con_dst = dst * selection == roster_todraft['dst']
     constraints.append(con_dst)
-
+    
     
     # constraint 7, 8, 9
     # rb selected cannot exceed number of rb + flex slots remaining
@@ -62,6 +62,13 @@ def get_constraints(n_todraft, roster_todraft, player_pool, budget, selection,
     # constraint 10: total costs less than or equal to allowed budget
     con_budget = costs * selection <= budget
     constraints.append(con_budget)
+    
+    if team_limit == True:
+        all_teams = player_pool['team'].unique()
+        for team in all_teams:
+            ta = np.array(player_pool['team'] == team).astype(int)
+            con_ta = ta * selection <= 3
+            constraints.append(con_ta)
     
     return constraints
 
@@ -109,6 +116,9 @@ def list_from_lineup(lineup):
 def get_name(id_number, player_dict):
     name = player_dict[id_number]['name']
     return name
+
+import filter_players
+import assign_id
 
 # import cheat sheet file with player data 
 data_in = "data/"
@@ -171,7 +181,7 @@ while lineups_got < lineups_toget:
         # get indices of players to select
         constraints = get_constraints(n_start, roster_todraft,
                                       player_pool, budget, selection,
-                                      costs)
+                                      costs, team_limit=True)
         sel_index = get_selection_indices(player_pool, selection,
                                           constraints, n_start)
         lineup = player_pool.iloc[sel_index, :].sort_values('pos')
@@ -203,7 +213,7 @@ while lineups_got < lineups_toget:
 cols_tmp = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DEF']
 df_tmp = pd.DataFrame(lineups, columns = cols_tmp)
 f_tmp = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup-upload-template.csv'])
-df_tmp.to_csv(f_tmp, index=False)
+df_tmp.to_csv('output/' + f_tmp, index=False)
 
 sorted_used = sorted(id_prop.items(), key=operator.itemgetter(1), reverse=True)
 
@@ -217,4 +227,4 @@ lineup_names = [[get_name(p, name_dict) for p in l] for l in lineups]
 
 df_names = pd.DataFrame(lineup_names, columns=cols_tmp)
 f_names = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup_names.csv'])
-df_names.to_csv(f_names, index=False)
+df_names.to_csv('output/' + f_names, index=False)
