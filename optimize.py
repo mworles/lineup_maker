@@ -181,7 +181,7 @@ while lineups_got < lineups_toget:
         # get indices of players to select
         constraints = get_constraints(n_start, roster_todraft,
                                       player_pool, budget, selection,
-                                      costs, team_limit=True)
+                                      costs, team_limit=False)
         sel_index = get_selection_indices(player_pool, selection,
                                           constraints, n_start)
         lineup = player_pool.iloc[sel_index, :].sort_values('pos')
@@ -209,7 +209,7 @@ while lineups_got < lineups_toget:
     lineups_got += 1
     #lineup_ids = get_lineup_ids(sel_index)
     lineups.append(list_from_lineup(lineup_from_ids(lineup_ids)))
-
+"""
 cols_tmp = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DEF']
 df_tmp = pd.DataFrame(lineups, columns = cols_tmp)
 f_tmp = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup-upload-template.csv'])
@@ -228,3 +228,4 @@ lineup_names = [[get_name(p, name_dict) for p in l] for l in lineups]
 df_names = pd.DataFrame(lineup_names, columns=cols_tmp)
 f_names = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup_names.csv'])
 df_names.to_csv('output/' + f_names, index=False)
+"""

@@ -8,6 +8,7 @@ from fuzzywuzzy import fuzz
 #pool_file = "-".join(['FanDuel-NFL', cid, 'players-list.csv'])
 pool_file = "-".join(['FanDuel-NFL', cid, 'owned.csv'])
 pool = pd.read_csv('data/pool/' + pool_file)
+print pool.head()
 df = pd.read_csv('data/projections_eligible.csv')
 
 # changes to player pool names for name matching
@@ -45,7 +46,7 @@ na_len = df[na_crit].shape[0]
 print '%s projected players with no pool id' % (na_len)
 print df[df['pool_id'] == 'NA']['name'].values
 
-df.to_csv('data/pool.csv', index=False)
+#df.to_csv('data/pool.csv', index=False)
 
 mrg = pd.merge(df, pool, left_on='pool_id', right_on='Id',
                how='inner')

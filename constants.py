@@ -1,4 +1,4 @@
-N_LINEUPS = 10
+N_LINEUPS = 25
 
 YEAR = 2019
 
