@@ -91,9 +91,17 @@ def get_selection_indices(player_pool, selection, constraints, n_todraft):
     problem.solve()
     sel_index = (-selection.value).flatten().argsort().tolist()[0][:n_todraft]
     return sel_index
+
+import filter_players
+import assign_id
+
+# import cheat sheet file with player data 
+data_in = "data/"
+df = pd.read_csv(data_in + 'pool.csv')
+
+"""
 week = 1
 year = 2017
-
 df = get_relative_points(year, week)
 df = clean_names(df)
 
@@ -152,7 +160,7 @@ while lineups_got < lineups_toget:
     lineups.append(lineup_ids)
     lineups_sets.append(set(lineup_ids))
     lineups_got += 1
-"""
+
 cols_tmp = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DEF']
 df_tmp = pd.DataFrame(lineups, columns = cols_tmp)
 f_tmp = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup-upload-template.csv'])
