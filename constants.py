@@ -13,7 +13,7 @@ ROSTER = {'qb': 1,
 BUDGET = 60000
 
 # contest identifier
-CONTEST_ID = '2019-09-15-38382'
+CONTEST_ID = '2019-09-15-38352'
 
 TEAMS_NF_FD = {'WSH': 'WAS',
                'LA': 'LAR'
