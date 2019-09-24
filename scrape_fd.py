@@ -13,42 +13,30 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-
-def get_data(soup_rows):
-    row_data = []
-    for r in soup_rows:
-        if 'b' in [tag.name for tag in r.find_all()]:
-            cols = [b.get_text() for b in r.find_all('b')]
-            pos = cols[0].strip()
-            cols[0] = 'name'
-        else:
-            row = [td.get_text() for td in r.find_all('td')]
-            if len(row) <=1:
-                pass
-            else:
-                row = map(lambda x: x.replace('$', ''), row)
-                row = map(lambda x: x.replace('@', 'awy'), row)
-                row = map(lambda x: x.replace('v.', 'hm'), row)
-                row.append(pos)
-                row_data.append(row)
-    return cols, row_data
-
-
-
+from selenium.webdriver.common.keys import Keys
     
+def get_name(list_i):
+    name = list_i.find_all('span')[1].get_text()
+    return name
 
+def get_player_info(p):
+    spans = p.find_all('span')
+    name = spans[1].get_text()
+    pct = spans[6].get_text()
+    pdict = {name: {'pct': pct, 'page': page_n}}
+    return pdict
+                    
 data_loc = "data/contests/"
 url = "https://www.fanduel.com/contests"
 
-#def scrape_url(url):
-browser = webdriver.Chrome('C:/Users/mworley/chromedriver.exe')
 options = webdriver.ChromeOptions()
-options.add_argument('--disable-gpu')
+options.add_argument("--start-maximized")
+browser = webdriver.Chrome('C:/Users/mworley/chromedriver.exe', 
+                           chrome_options=options)
 browser.get(url)
 
-#login = browser.find_element_by_link_text('Log in')
-#login.click()
 
+print 'logging in'
 login_user = browser.find_element_by_id('forms.login.email')
 login_user.send_keys('mworles@gmail.com')
 login_pwd = browser.find_element_by_id('forms.login.password')
@@ -57,11 +45,16 @@ submit = browser.find_element_by_id('forms.login.submit')
 submit.click()
 
 time.sleep(2)
+print 'selecting history'
 btn = browser.find_element_by_link_text('History')
 btn.click()
 
-time.sleep(5)
+
+time.sleep(4)
+print 'compiling contests'
 soup = bsoup(browser.page_source, 'html.parser')
+
+"""
 tables = soup.find_all('table')
 
 contests = []
@@ -73,51 +66,123 @@ for t in tables:
     ct = cr.find('td').find('span').get_text()
     contests.append([hd, ct])
 
+print 'opening contest'
 link_text = contests[0][-1]
-link = browser.find_element_by_link_text(link_text)
+
+link = browser.find_element_by_link_text(cel_text)
+link.click()
+"""
+
+cid = str(38547)
+file_name = 'own_' + cid + '.csv'
+
+ctag = 'games/38547/contests'
+cel = soup.select_one("a[href*=%s]" % (ctag))
+cel_text = cel.find('span').get_text()
+link = browser.find_element_by_link_text(cel_text)
 link.click()
 
-#entry = browser.find_element_by_xpath('//*[@id="global-view"]/div/div/div/div[7]/ol/li[1]')
-#entry.click()
-
-time.sleep(3)
-entries = browser.find_elements_by_tag_name('li')[0:10]
-"""
-entries[0].click()
-
 time.sleep(2)
-soup = bsoup(browser.page_source, 'html.parser')
-entry_lu = soup.find('div', {'class': 'live-comparison-entry active'})
-ps = entry_lu.find_all('li')
-for p in ps:
-    spans = p.find_all('span')
-    text = [s.get_text() for s in spans]
-    print text
-    #p.find('span', {'data-test-id': 'data-chunk-value'})
-    #print p.get_text()
-"""
 
-"""
-//*[@id="global-view"]/div/div/div/div[7]/ol/li[1]/div[2]
-soup = bsoup(browser.page_source, 'html.parser')
-entry_lu = soup.find('div', {'class': 'live-comparison-entry active'})
-entry_li = entry_lu.find_all('li')
-print len(li)
-"""
-#soup = bsoup(browser.page_source, 'html.parser')
-"""
-tables = soup.find_all('table')
-t = tables[8]
-rows = t.find_all('tr')
-cols, row_data = get_data(rows)
-cols.append('pos')
-df = pd.DataFrame(row_data, columns=cols)
-"""
-"""
-f = 'fd_' + str(y) + '_' + str(w) + '.csv'
-print "writing .csv file: %s" % (f)
-df.to_csv(data_loc + f)
-time.sleep(1)
+try:
+    prog = pd.read_csv('data/contests/progress/' + cid + '.csv')
+    page_progress = prog['page'].max()
+    own_df = pd.read_csv(data_loc + file_name)
+    own_df = own_df.set_index('name')
+    own_pct = own_df.to_dict('index')
+except:
+    own_pct = {}
 
-browser.quit()
-"""
+csoup = bsoup(browser.page_source, 'html.parser')
+pagin = csoup.find('div', {'class': 'pagination-status'})
+n_pages = int(pagin.get_text().split(' ')[-1])
+
+
+if len(own_pct.keys()) > 0:
+    page_entry = browser.find_element_by_tag_name('input')
+    page_n = page_progress + 1
+    n_del = len(str(page_n))
+    while n_del > 0:
+        page_entry.send_keys(Keys.BACKSPACE)
+        n_del -= 1
+    page_entry.send_keys(str(page_n))
+else:
+    page_n = 1
+
+last_entry_name = ''
+
+pages_read = []
+
+while page_n < n_pages:
+    print 'page %s of %s' % (page_n, n_pages)
+    time.sleep(2)
+
+    soup = bsoup(browser.page_source, 'html.parser')
+    eds = soup.find_all('div', {'class': 'user-info'})
+    enames = [e.find_all('span')[2].get_text() for e in eds]
+    enames = [n.replace('\n','').strip() for n in enames]
+    uis = [enames.index(x) for x in enames]
+    uis = list(set(uis))
+    uis = [x + 1 for x in uis]
+    uis = [x for x in uis if x < 8]
+    keep_names = [enames[(x-1)] for x in uis]
+    print keep_names
+    print last_entry_name
+    print uis
+
+    if keep_names[0] == last_entry_name and len(uis) == 1:
+        pass
+    else:
+        if keep_names[0] == last_entry_name:
+            uis = uis[1:]
+
+        print 'compiling entries'
+        
+        page_new = []
+        
+        for li_n in uis:
+            try:
+                lixp = "//*[@id='global-view']/div/div/div/div[7]/ol/li[%s]" % (li_n)
+                target = browser.find_element_by_xpath(lixp)
+                actions = ActionChains(browser)
+                actions.move_to_element(target).perform()
+                time.sleep(1)
+                target.click()
+                soup = bsoup(browser.page_source, 'html.parser')
+                entry_lu = soup.find('div', {'class': 'live-comparison-entry active'})
+                
+                ps = entry_lu.find_all('li')
+                
+                entry_names = map(get_name, ps)
+                new_names = [x for x in entry_names if x not in own_pct.keys()]
+                new_i = [entry_names.index(n) for n in new_names]
+                new_p = [ps[i] for i in new_i]
+                print new_names
+                page_new.extend(new_names)
+                
+                for p in new_p:
+                    own_pct.update(get_player_info(p))
+
+            except:
+                print 'selection error'
+        
+        pages_read.append([page_n, len(page_new)])
+        last_entry_name = keep_names[-1]
+        op = pd.DataFrame.from_dict(own_pct, orient='index')
+        op.index.name = 'name'
+        op.to_csv('data/contests/' + file_name)
+        tmp = "c:/users/mworley/dropbox/tmp.csv"
+        op.to_csv(tmp)
+        dfpr = pd.DataFrame(pages_read, columns=['page', 'new_names'])
+        dfpr.to_csv('data/contests/progress/' + cid + '.csv')
+
+    time.sleep(1)
+    
+    print 'next page'
+    nxt_xp = '//*[@id="global-view"]/div/div/div/div[6]/div[2]/nav/div[2]/button[3]'
+    nxt = browser.find_element_by_xpath(nxt_xp)
+    actions = ActionChains(browser)
+    actions.move_to_element(nxt).perform()
+    nxt = browser.find_element_by_xpath(nxt_xp)
+    nxt.click()
+    page_n += 1
