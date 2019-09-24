@@ -14,7 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
-    
+
 def get_name(list_i):
     name = list_i.find_all('span')[1].get_text()
     return name
@@ -75,23 +75,26 @@ link.click()
 
 cid = str(38547)
 file_name = 'own_' + cid + '.csv'
-
 ctag = 'games/38547/contests'
 cel = soup.select_one("a[href*=%s]" % (ctag))
 cel_text = cel.find('span').get_text()
 link = browser.find_element_by_link_text(cel_text)
 link.click()
+print 'opening contest %s' % (cid)
 
 time.sleep(2)
 
 try:
-    prog = pd.read_csv('data/contests/progress/' + cid + '.csv')
+    prog = pd.read_csv('data/contests/progress/' + cid + '.csv', index_col=0)
+    pages_read = prog.values.tolist()
+    print pages_read
     page_progress = prog['page'].max()
     own_df = pd.read_csv(data_loc + file_name)
     own_df = own_df.set_index('name')
     own_pct = own_df.to_dict('index')
 except:
     own_pct = {}
+    pages_read = []
 
 csoup = bsoup(browser.page_source, 'html.parser')
 pagin = csoup.find('div', {'class': 'pagination-status'})
@@ -111,11 +114,8 @@ else:
 
 last_entry_name = ''
 
-pages_read = []
-
 while page_n < n_pages:
     print 'page %s of %s' % (page_n, n_pages)
-    time.sleep(2)
 
     soup = bsoup(browser.page_source, 'html.parser')
     eds = soup.find_all('div', {'class': 'user-info'})
@@ -126,17 +126,13 @@ while page_n < n_pages:
     uis = [x + 1 for x in uis]
     uis = [x for x in uis if x < 8]
     keep_names = [enames[(x-1)] for x in uis]
-    print keep_names
-    print last_entry_name
-    print uis
+
 
     if keep_names[0] == last_entry_name and len(uis) == 1:
         pass
     else:
         if keep_names[0] == last_entry_name:
             uis = uis[1:]
-
-        print 'compiling entries'
         
         page_new = []
         
@@ -146,8 +142,15 @@ while page_n < n_pages:
                 target = browser.find_element_by_xpath(lixp)
                 actions = ActionChains(browser)
                 actions.move_to_element(target).perform()
-                time.sleep(1)
                 target.click()
+
+                try:
+                    element = WebDriverWait(browser, 5).until(
+                        EC.presence_of_element_located((By.XPATH, "//*[@id='global-view']/div/div/div/div[8]/div[2]/div"))
+                        )
+                finally:
+                    pass
+                    
                 soup = bsoup(browser.page_source, 'html.parser')
                 entry_lu = soup.find('div', {'class': 'live-comparison-entry active'})
                 
@@ -157,32 +160,35 @@ while page_n < n_pages:
                 new_names = [x for x in entry_names if x not in own_pct.keys()]
                 new_i = [entry_names.index(n) for n in new_names]
                 new_p = [ps[i] for i in new_i]
-                print new_names
+                if len(new_names) != 0:
+                    print new_names
                 page_new.extend(new_names)
                 
                 for p in new_p:
                     own_pct.update(get_player_info(p))
-
+                
+                browser.execute_script("scroll(0, 0);")
             except:
                 print 'selection error'
+            
+            time.sleep(2)
         
-        pages_read.append([page_n, len(page_new)])
-        last_entry_name = keep_names[-1]
         op = pd.DataFrame.from_dict(own_pct, orient='index')
         op.index.name = 'name'
         op.to_csv('data/contests/' + file_name)
-        tmp = "c:/users/mworley/dropbox/tmp.csv"
-        op.to_csv(tmp)
-        dfpr = pd.DataFrame(pages_read, columns=['page', 'new_names'])
-        dfpr.to_csv('data/contests/progress/' + cid + '.csv')
-
-    time.sleep(1)
+        dbox = "c:/users/mworley/dropbox/gh_data/lineup_maker/"
+        op.to_csv(dbox + file_name)
     
-    print 'next page'
+    pages_read.append([page_n, len(page_new)])
+    last_entry_name = keep_names[-1]
+    dfpr = pd.DataFrame(pages_read, columns=['page', 'new_names'])
+    dfpr.to_csv('data/contests/progress/' + cid + '.csv')
+    dfpr.to_csv(dbox + cid + '.csv')
+
     nxt_xp = '//*[@id="global-view"]/div/div/div/div[6]/div[2]/nav/div[2]/button[3]'
-    nxt = browser.find_element_by_xpath(nxt_xp)
-    actions = ActionChains(browser)
-    actions.move_to_element(nxt).perform()
+    browser.execute_script("scroll(0, 0);")
     nxt = browser.find_element_by_xpath(nxt_xp)
     nxt.click()
+    time.sleep(2)
+
     page_n += 1
