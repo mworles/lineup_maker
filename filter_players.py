@@ -2,8 +2,7 @@ import pandas as pd
 from constants import CONTEST_ID as cid
 from constants import TEAMS_NF_FD
 
-#pool_file = "-".join(['FanDuel-NFL', cid, 'players-list.csv'])
-pool_file = "-".join(['FanDuel-NFL', cid, 'owned.csv'])
+pool_file = "-".join(['FanDuel-NFL', cid, 'players-list.csv'])
 pool = pd.read_csv('data/pool/' + pool_file)
 df = pd.read_csv('data/nf_projections.csv')
 
