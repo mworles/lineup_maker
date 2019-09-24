@@ -3,6 +3,7 @@ import numpy as np
 import cvxpy
 import random
 import operator
+from sklearn.linear_model import LinearRegression
 
 from constants import ROSTER, BUDGET, CONTEST_ID
 from constants import N_LINEUPS, MAX_OVERLAP, MAX_EXPOSURE
@@ -117,6 +118,60 @@ def get_name(id_number, player_dict):
     name = player_dict[id_number]['name']
     return name
 
+def refine_pool(df):
+    new_data = []
+    val = 'val_fd'
+    sal = 'cst_fd'
+    pts = 'fp_fd'
+    
+    for pos in ['QB', 'RB', 'WR', 'TE', 'DST']:
+        w = df[df['pos'] == pos]
+        #w = w[w[sal, val, pts].notnull()]
+        w = w[w[sal].notnull()]
+        w = w[w[val].notnull()]
+        w = w[w[pts].notnull()]
+        w = w[w[pts] > 2.0]
+
+
+        # compute expected value and points given salary
+        xmat = w['cst_fd'].values.reshape(-1, 1)
+        w['vexp'] = LinearRegression().fit(xmat, w[val]).predict(xmat)
+        w['pexp'] = LinearRegression().fit(xmat, w[pts]).predict(xmat)
+
+        # compute disparity between points and salary-expected points
+        w['val_disp'] =  np.round(w[val] - w['vexp'], 2)
+
+        # compute disparity between points and salary-expected points
+        w['fp_disp'] =  np.round(w[pts] - w['pexp'], 2)
+
+        # adjust for expected points
+        w['fp_dispa'] = w['fp_disp'] / w['pexp']
+        
+        # keep value players
+        w = w[w['val_disp'] > -0.50]
+        
+        # keep top 5 projected dst only
+        if pos == 'DST':
+            w = w.sort_values(pts, ascending=False)
+            w = w.iloc[0:5, :]
+            
+        # keep top 8 projected TE only
+        if pos == 'TE':
+            w = w.sort_values(pts, ascending=False)
+            w = w.iloc[0:8, :]
+        
+        # keep top 7 projected QB only
+        if pos == 'QB':
+            w = w.sort_values(pts, ascending=False)
+            w = w.iloc[0:7, :]
+
+        new_data.append(w)
+        
+    dff = pd.concat(new_data)
+    
+    
+    return dff
+
 import filter_players
 import assign_id
 
@@ -134,6 +189,8 @@ dst_cut_id = dst.iloc[dst_cut:, ]['pool_id'].values
 
 df = df[~df['pool_id'].isin(dst_cut_id)]
 
+df = refine_pool(df)
+
 
 # set budget
 budget = BUDGET
@@ -149,6 +206,8 @@ rtn = 'fp_fd'
 lineups = []
 lineups_unique = []
 lineups_ids = []
+
+pos_dict = df[['pool_id', 'pos']].set_index('pool_id').to_dict('index')
 
 while lineups_got < lineups_toget:
 
@@ -167,7 +226,8 @@ while lineups_got < lineups_toget:
     print 'setting exposure limits'
     
     for k in id_prop.keys():
-        if id_prop[k] > MAX_EXPOSURE:
+        pos = pos_dict[k]['pos']
+        if id_prop[k] > MAX_EXPOSURE[pos]:
             
             player_pool = player_pool.loc[player_pool['pool_id'] != k]
     
@@ -205,11 +265,12 @@ while lineups_got < lineups_toget:
     print "Lineup %s" % (lineups_got + 1)
     print ''
     print lineup
+    print 'Total salary: %s' % (lineup['cst_fd'].sum())
     lineups_unique.append(lineup_ids)
     lineups_got += 1
     #lineup_ids = get_lineup_ids(sel_index)
     lineups.append(list_from_lineup(lineup_from_ids(lineup_ids)))
-"""
+
 cols_tmp = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'FLEX', 'DEF']
 df_tmp = pd.DataFrame(lineups, columns = cols_tmp)
 f_tmp = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup-upload-template.csv'])
@@ -228,4 +289,3 @@ lineup_names = [[get_name(p, name_dict) for p in l] for l in lineups]
 df_names = pd.DataFrame(lineup_names, columns=cols_tmp)
 f_names = "".join(['FanDuel-NFL-', CONTEST_ID, '-lineup_names.csv'])
 df_names.to_csv('output/' + f_names, index=False)
-"""
